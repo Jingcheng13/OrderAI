@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from rich import print
 
-from chat.tools import run_command, read, write, tools
+from chat.tools import shell, read, write, tools
 from prompt.system_prompt import get_system_prompt
 from prompt.skills import get_skills_list
 
@@ -31,6 +31,7 @@ def send_messages(messages: list):
         messages=messages,
         tools=tools
     )
+    logger.debug(response.model_dump_json(indent=2))
     return response
 
 
@@ -39,10 +40,10 @@ def execute_tool(tool_call):
     func_name = tool_call.function.name
     arguments = json.loads(tool_call.function.arguments)
 
-    if func_name == 'run_command':
+    if func_name == 'shell':
         command = arguments['command']
         print(f"[dim]执行命令: {command}[/dim]")
-        return run_command(command)
+        return shell(command)
 
     elif func_name == 'write':
         target_file = arguments['target_file']
@@ -67,10 +68,11 @@ def process_turn(messages: list):
     失败时返回 None。
     """
     messages = messages.copy()
+    logger.debug(f'消息列表（无system）: {messages}')
+
     # 每次调用时获取最新的系统提示词和技能列表
     system_content = get_system_prompt() + get_skills_list()
     messages.insert(0, {"role": "system", "content": system_content})
-    logger.debug(f'消息列表: {messages}')
 
     response = send_messages(messages)
 
@@ -81,7 +83,7 @@ def process_turn(messages: list):
 
     while response.choices[0].message.tool_calls:
         # 将模型的工具调用消息加入历史
-        messages.append(response.choices[0].message)
+        messages.append(response.choices[0].message.model_dump(exclude_none=True))
 
         for tool_call in response.choices[0].message.tool_calls:
             tool_output = execute_tool(tool_call)
@@ -99,4 +101,9 @@ def process_turn(messages: list):
             return None
 
     logger.debug(f'模型响应: {response}')
-    return response
+
+    messages.append(response.choices[0].message.model_dump(exclude_none=True))
+
+    logger.debug(f'变量messages[1:]: {messages[1:]}')
+
+    return messages[1:]

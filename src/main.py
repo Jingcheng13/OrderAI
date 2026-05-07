@@ -4,8 +4,14 @@ from pathlib import Path
 from rich import print
 from rich.markdown import Markdown
 
+from chat import process_turn
 from prompt.summary import summary
-from chat.agent import process_turn
+
+
+models = [
+    ['Deepseek-ai/deepseek-v4-pro', 'Deepseek V4 Pro'],
+    ['Qwen/Qwen3.5-397B-A17B', 'Qwen 3.5']
+]
 
 
 log_dir = Path("./logs")
@@ -49,40 +55,66 @@ while True:
     user_input = input('')
     print('─' * os.get_terminal_size().columns)
 
-    if user_input.lower() == 'q':
-        print("再见！")
-        logger.info('退出软件')
-        break
+    if not user_input:
+        continue
 
-    elif user_input.lower() == '/summary':
-        print(f"[dim]压缩对话中...")
+    if user_input[0] == '/':
+        command = user_input[1:].lower()
 
-        messages.append({'role': 'system', 'content': summary})
-        logger.debug(f'Messages: {messages}')
+        if command == 'quit':
+            # print("再见！")
+            logger.info('退出软件')
+            break
 
-        # 调用封装好的函数，自动处理工具调用
-        response = process_turn(messages)
+        elif command == 'summary':
+            if not messages:
+                print("[red]没有可压缩的对话[/red]")
+                continue
+            print(f"[dim]压缩对话中...")
 
-        if response is None:
-            continue
+            messages.append({'role': 'system', 'content': summary})
+            logger.debug(f'Messages: {messages}')
 
-        # 清空消息，只保留系统提示 + 摘要内容
-        messages.clear()
-        messages.append({
-            'role': 'system',
-            'content': f'此前对话：\n{response.choices[0].message.content}'
-        })
-        print(f"[dim]压缩对话成功[/dim]")
+            # 调用封装好的函数，自动处理工具调用
+            response = process_turn(messages)
+
+            if response is None:
+                continue
+            else:
+                messages = response
+
+            # 清空消息，只保留系统提示 + 摘要内容
+            messages.clear()
+            messages.append({
+                'role': 'system',
+                'content': f'此前对话：\n{response.choices[0].message.content}'
+            })
+            print(f"[dim]压缩对话成功[/dim]")
+
+        elif command == 'model' or command == 'models':
+            print(f"请选择模型：")
+            for i in range(len(models)):
+                print(f'{i+1} {models[i][1]}')
+
+        elif command == 'new_model':
+            pass
+
+        else:
+            pass
+        
 
     else:
         messages.append({'role': 'user', 'content': user_input})
 
         response = process_turn(messages)
 
-        if response is None or not response.choices:
-            continue
-
-        if response.choices[0].message.content:
-            print(Markdown(response.choices[0].message.content))
-            if response.usage:
-                print(f'[dim]本次消耗token {response.usage.total_tokens}[/dim]\n')
+        if response is None:
+                continue
+        else:
+            messages = response
+            if messages[-1]['role'] == 'assistant':
+                print(Markdown(messages[-1]['content']))
+                # if response.usage:
+                #     print(f'[dim]本次消耗token {response.usage.total_tokens}[/dim]')
+    
+    print()

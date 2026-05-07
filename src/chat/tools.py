@@ -7,8 +7,8 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "run_command",
-            "description": f"在终端运行命令。用户操作系统：。在Windows中尽量使用Powershell（使用powershell -Command \"...\"）。",
+            "name": "shell",
+            "description": f"在终端运行命令。用户操作系统：。在Windows中尽量使用Powershell（command: powershell -Command \"...\"）。",
             "parameters": {
                 "properties": {
                     "command": {
@@ -66,7 +66,7 @@ tools = [
 ]
 
 
-def run_command(command, timeout=30):
+def shell(command, timeout=30):
     """执行命令并返回输出"""
     try:
         result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
